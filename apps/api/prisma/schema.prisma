@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model Club {
+  id           String    @id @default(cuid())
+  name         String
+  slug         String    @unique
+  // store JSON as text; app enforces shape
+  brandingJson String?   @db.NVarChar(Max)
+  createdAt    DateTime  @default(now())
+  competitions Competition[]
+  members      ClubMember[]
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  // enums not supported in SQL Server connector → store as String
+  role      String    @default("PLAYER") @db.NVarChar(32)
+  createdAt DateTime  @default(now())
+  members   ClubMember[]
+  entries   CompetitionEntry[]
+}
+
+model ClubMember {
+  clubId String
+  userId String
+  role   String   @default("PLAYER") @db.NVarChar(32)
+
+  club   Club     @relation(fields: [clubId], references: [id], onDelete: NoAction)
+  user   User     @relation(fields: [userId], references: [id], onDelete: NoAction)
+
+  @@id([clubId, userId])
+  @@index([userId])
+}
+
+model Competition {
+  id             String    @id @default(cuid())
+  clubId         String
+  name           String
+  sport          String
+  status         String    @default("DRAFT") @db.NVarChar(32) // DRAFT | OPEN | RUNNING | FINISHED
+  entryFeeCents  Int
+  currency       String    @default("EUR")   @db.NVarChar(8)
+  // store JSON as text
+  rulesJson      String?   @db.NVarChar(Max)
+  startRoundAt   DateTime?
+  createdAt      DateTime  @default(now())
+
+  club           Club      @relation(fields: [clubId], references: [id], onDelete: NoAction)
+  rounds         Round[]
+  entries        CompetitionEntry[]
+
+  @@index([clubId, status])
+}
+
+model Round {
+  id             String    @id @default(cuid())
+  competitionId  String
+  roundNumber    Int
+  pickDeadlineAt DateTime
+  status         String    @default("UPCOMING") @db.NVarChar(32) // UPCOMING | LOCKED | RESULTING | COMPLETE
+
+  competition    Competition @relation(fields: [competitionId], references: [id], onDelete: NoAction)
+  fixtures       Fixture[]
+
+  @@index([competitionId, roundNumber])
+}
+
+model Team {
+  id       String   @id @default(cuid())
+  leagueId String?
+  name     String
+  extRef   String?
+}
+
+model Fixture {
+  id            String   @id @default(cuid())
+  competitionId String
+  roundId       String
+  homeTeamId    String
+  awayTeamId    String
+  kickoffAt     DateTime
+  status        String   @default("SCHEDULED") @db.NVarChar(32) // SCHEDULED | PLAYED | POSTPONED
+  result        String?  @db.NVarChar(32) // HOME | AWAY | DRAW
+
+  round         Round    @relation(fields: [roundId], references: [id], onDelete: NoAction)
+
+  @@index([roundId])
+}
+
+model CompetitionEntry {
+  id              String   @id @default(cuid())
+  competitionId   String
+  userId          String
+  status          String   @default("PENDING") @db.NVarChar(32) // PENDING | ACTIVE | ELIMINATED | WON
+  stripePaymentId String?
+  createdAt       DateTime @default(now())
+
+  competition     Competition     @relation(fields: [competitionId], references: [id], onDelete: NoAction)
+  user            User            @relation(fields: [userId], references: [id], onDelete: NoAction)
+  picks           Pick[]
+
+  @@unique([competitionId, userId])
+}
+
+model Pick {
+  id                  String   @id @default(cuid())
+  competitionEntryId  String
+  roundId             String
+  teamId              String
+  madeAt              DateTime @default(now())
+  status              String   @default("PENDING") @db.NVarChar(32) // PENDING | WIN | LOSE | INVALID
+
+  entry CompetitionEntry @relation(fields: [competitionEntryId], references: [id], onDelete: NoAction)
+
+  @@unique([competitionEntryId, roundId])
+}
