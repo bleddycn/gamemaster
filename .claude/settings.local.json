@@ -3,7 +3,11 @@
     "allow": [
       "Bash(mkdir:*)",
       "Bash(find:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(test:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(curl:*)",
+      "Bash(pnpm dev:*)"
     ],
     "deny": []
   }

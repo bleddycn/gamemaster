@@ -56,6 +56,46 @@ app.post("/clubs/:clubId/competitions", async (req, reply) => {
   return created;
 });
 
+// Get a club by slug (for the frontend detail page)
+app.get("/clubs/by-slug/:slug", async (req, reply) => {
+  const { slug } = req.params as { slug: string };
+  const club = await prisma.club.findUnique({
+    where: { slug },
+    select: { id: true, name: true, slug: true }
+  });
+  if (!club) {
+    reply.code(404);
+    return { error: "Club not found" };
+  }
+  return club;
+});
+
+// List competitions for a club (optional ?status=OPEN|RUNNING|DRAFT|FINISHED)
+app.get("/clubs/:clubId/competitions", async (req) => {
+  const { clubId } = req.params as { clubId: string };
+  const { status } = req.query as { status?: string };
+
+  const where: any = { clubId };
+  if (status) {
+    where.status = status.toUpperCase();
+  }
+
+  const items = await prisma.competition.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      sport: true,
+      status: true,
+      entryFeeCents: true,
+      currency: true,
+      createdAt: true
+    }
+  });
+  return { items };
+});
+
 app.get("/clubs", async () => {
   const clubs = await prisma.club.findMany({
     orderBy: { createdAt: "desc" },
