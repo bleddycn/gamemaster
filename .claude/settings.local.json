@@ -7,7 +7,8 @@
       "Bash(test:*)",
       "Bash(npx prisma migrate:*)",
       "Bash(curl:*)",
-      "Bash(pnpm dev:*)"
+      "Bash(pnpm dev:*)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

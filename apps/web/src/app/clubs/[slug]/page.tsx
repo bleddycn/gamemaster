@@ -1,4 +1,5 @@
-import CreateCompetitionForm from "@/components/CreateCompetitionForm";
+import JoinCompetitionInline from "@/components/JoinCompetitionInline";
+import ActivateTemplateForClub from "@/components/ActivateTemplateForClub";
 import { revalidatePath } from "next/cache";
 
 async function getClubAndComps(slug: string) {
@@ -44,19 +45,77 @@ export default async function ClubPage({ params }: { params: { slug: string } })
             )}
             {comps.items.map(c => (
               <li key={c.id} className="rounded-lg border p-4 bg-white">
-                <div className="font-medium">{c.name}</div>
-                <div className="text-sm text-gray-600">
-                  {c.sport} · {c.status} · {c.currency} {(c.entryFeeCents/100).toFixed(2)}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <a href={`/competitions/${c.id}`} className="font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                      {c.name}
+                    </a>
+                    <div className="text-sm text-gray-600">
+                      {c.sport} · {c.status} · {c.currency} {(c.entryFeeCents/100).toFixed(2)}
+                    </div>
+                    <div className="mt-1">
+                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                        c.status?.toUpperCase() === "OPEN"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : c.status?.toUpperCase() === "DRAFT"
+                          ? "bg-amber-100 text-amber-700"
+                          : c.status?.toUpperCase() === "RUNNING"
+                          ? "bg-indigo-100 text-indigo-700"
+                          : "bg-gray-100 text-gray-700"
+                      }`}>
+                        {c.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {c.status === "DRAFT" && (
+                    <form action={async () => {
+                      "use server";
+                      const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+                      const res = await fetch(`${base}/competitions/${c.id}/open`, { method: "POST" });
+                      if (!res.ok) {
+                        const t = await res.text();
+                        console.error("OPEN_ERROR", res.status, t);
+                        throw new Error(`Open failed: ${res.status}`);
+                      }
+                      const { revalidatePath } = await import("next/cache");
+                      revalidatePath(`/clubs/${club.slug}`);
+                    }}>
+                      <button className="rounded-lg bg-emerald-600 text-white px-3 py-2 text-sm hover:bg-emerald-700">
+                        Open for entries
+                      </button>
+                    </form>
+                  )}
                 </div>
+
+                {(c.status?.toUpperCase() === "OPEN") && (
+                  <div className="mt-3 pt-3 border-t">
+                    <JoinCompetitionInline
+                      apiBase={base}
+                      competitionId={c.id}
+                      onJoined={refresh}
+                    />
+                  </div>
+                )}
+
+                {/* DEBUG: force render the join form to verify it appears; remove after test */}
+                {/* <div className="mt-2">
+                  <JoinCompetitionInline
+                    apiBase={base}
+                    competitionId={c.id}
+                    onJoined={refresh}
+                  />
+                </div> */}
               </li>
             ))}
           </ul>
         </div>
 
-        <CreateCompetitionForm
+        {/* Replaced direct competition creation with template activation */}
+        <ActivateTemplateForClub
           apiBase={base}
           clubId={club.id}
-          onCreated={refresh}
+          onActivated={refresh}
         />
       </section>
     </main>

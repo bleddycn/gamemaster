@@ -1,0 +1,2 @@
+pnpm -F @gm/api dev
+pnpm -F web dev

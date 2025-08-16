@@ -50,3 +50,10 @@ export const ActivateTemplateSchema = z.object({
   currency: z.string().length(3).default("EUR")
 });
 export type ActivateTemplateInput = z.infer<typeof ActivateTemplateSchema>;
+
+// ---------- Player join ----------
+export const JoinCompetitionSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1).optional()
+});
+export type JoinCompetitionInput = z.infer<typeof JoinCompetitionSchema>;

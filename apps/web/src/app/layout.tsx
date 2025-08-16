@@ -27,7 +27,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <header className="bg-gradient-to-r from-indigo-600 to-rose-600 text-white">
+          <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="/" className="font-bold tracking-tight">GameMaster</a>
+            <nav className="text-sm space-x-4 opacity-90">
+              <a href="/clubs" className="hover:underline">Clubs</a>
+              <a href="/admin/templates" className="hover:underline">Templates</a>
+            </nav>
+          </div>
+        </header>
+        <div className="max-w-6xl mx-auto">{children}</div>
       </body>
     </html>
   );

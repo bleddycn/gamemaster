@@ -64,7 +64,7 @@ onlyBuiltDependencies:
 **Database Configuration (`apps/api/prisma/schema.prisma`):**
 - Provider: SQL Server (Azure compatible)
 - Shadow database support for migrations
-- Models: Club, User, ClubMember, Competition, Round, Team, Fixture, CompetitionEntry, Pick
+- Models: Club, User, ClubMember, GameTemplate, Competition, Round, Team, Fixture, CompetitionEntry, Pick
 - String-based enums (SQL Server compatible)
 - JSON fields stored as NVarChar(Max)
 
@@ -77,12 +77,20 @@ onlyBuiltDependencies:
 - `GET /healthz` - Health check endpoint
 - `GET /dbz` - Database connection check (counts clubs)
 - `GET /version` - API version info
+- `GET /__routes` - Route introspection for debugging
 - `GET /me` - Placeholder auth endpoint (returns mock user)
 - `GET /clubs` - List all clubs (id, name, slug)
+- `POST /clubs` - Create new club with validation
 - `GET /clubs/by-slug/:slug` - Get a club by slug (for frontend detail page)
 - `GET /clubs/:clubId/competitions` - List competitions for a club (optional ?status filter)
-- `POST /clubs` - Create new club with validation
 - `POST /clubs/:clubId/competitions` - Create competition with Zod validation (status: DRAFT)
+- `POST /clubs/:clubId/activate-template/:templateId` - Activate template into competition
+- `GET /templates` - List templates with filters (status, upcoming)
+- `POST /templates` - Create game templates (Platform Admin)
+- `GET /competitions/:id` - Get competition details with rounds/fixtures
+- `POST /competitions/:id/open` - Open competition for entries (DRAFT → OPEN)
+- `POST /competitions/:id/entries` - Join competition (creates CompetitionEntry)
+- `POST /picks` - Submit fixture picks (temporary email-based auth)
 
 **Seed Data (`apps/api/prisma/seed.ts`):**
 - Upserts two GAA clubs: Cavan GAA and Monaghan GAA
@@ -103,10 +111,17 @@ onlyBuiltDependencies:
 **Pages:**
 - `/` - Default Next.js homepage
 - `/clubs` - Server-side rendered clubs list from API
-- `/clubs/[slug]` - Dynamic club detail page with competitions list and creation form
+- `/clubs/[slug]` - Dynamic club detail page with template activation
+- `/admin/templates` - Platform admin interface for template management
+- `/competitions/[id]` - Competition detail page with fixture picking
+- `/debug/competitions` - Development utility for viewing all competitions
 
 **Components (`apps/web/src/components/`):**
 - `CreateCompetitionForm.tsx` - Client-side form for creating competitions with validation
+- `ActivateTemplateForClub.tsx` - Template activation interface for clubs
+- `FixturePicker.tsx` - Interactive fixture picking with radio buttons
+- `JoinCompetitionInline.tsx` - Player join form for competitions
+- `ui/Card.tsx` - Reusable card components (`Card`, `CardHeader`)
 
 ## Packages
 
@@ -124,6 +139,9 @@ onlyBuiltDependencies:
   - `CompetitionStatusEnum`: DRAFT, OPEN, RUNNING, FINISHED
   - `CreateCompetitionSchema`: Competition creation validation
   - `CreateClubSchema`: Club creation validation with slug regex
+  - `CreateGameTemplateSchema`: Game template creation with activation windows
+  - `ActivateTemplateSchema`: Template activation validation (entry fee, currency)
+  - `JoinCompetitionSchema`: Player join validation (email, name)
 - `src/types.ts`: TypeScript interfaces
   - `Club`: Basic club structure
   - `Competition`: Competition with status from schema
@@ -141,7 +159,8 @@ onlyBuiltDependencies:
 1. **Install dependencies:** Run `pnpm install` at root
 2. **Database setup:** Configure `.env` with DATABASE_URL and SHADOW_DATABASE_URL
 3. **Generate Prisma client:** `pnpm --filter @gm/api run prisma:generate`
-4. **Run migrations:** `pnpm --filter @gm/api run prisma:migrate --name init`
+4. **Run migrations:** `pnpm --filter @gm/api run prisma:migrate dev --name <migration-name>`
+   - Note: If Prisma migrate commands timeout, migrations can be applied manually
 5. **Seed database:** Prisma will automatically run seed after migration
 6. **Start dev servers:** Run `pnpm dev` to start all services in parallel
    - Alternative: Run individually with `pnpm --filter @gm/api dev` and `pnpm --filter web dev`
@@ -167,8 +186,11 @@ pnpm --filter web dev
 **Available routes:**
 - http://localhost:3000 - Homepage
 - http://localhost:3000/clubs - List of all clubs
-- http://localhost:3000/clubs/cavan-gaa - Cavan GAA club page with competitions
-- http://localhost:3000/clubs/monaghan-gaa - Monaghan GAA club page with competitions
+- http://localhost:3000/clubs/cavan-gaa - Cavan GAA club page with template activation
+- http://localhost:3000/clubs/monaghan-gaa - Monaghan GAA club page with template activation
+- http://localhost:3000/admin/templates - Platform admin template management
+- http://localhost:3000/competitions/[id] - Competition detail with fixture picking
+- http://localhost:3000/debug/competitions - Development view of all competitions
 
 ## Database Schema
 
@@ -176,7 +198,14 @@ pnpm --filter web dev
 - **Club**: Organizations with name, slug, optional branding JSON
 - **User**: Users with email, name, role (SITE_ADMIN/CLUB_ADMIN/PLAYER)
 - **ClubMember**: Many-to-many relationship between users and clubs
+- **GameTemplate**: Reusable game templates with activation windows and rules
+  - gameType: Type of game (e.g., "LMS" for Last Man Standing)
+  - status: DRAFT | PUBLISHED | ARCHIVED
+  - Activation and join windows for time-based availability
+  - Links to competitions created from template
 - **Competition**: Club competitions with entry fees, status tracking
+  - Optional templateId linking to GameTemplate
+  - Inherits rules and configuration from template
 - **Round**: Competition rounds with deadlines and status
 - **Team**: Sports teams with external references
 - **Fixture**: Matches between teams with results
@@ -190,6 +219,91 @@ pnpm --filter web dev
 - String-based enums for SQL Server compatibility
 - Proper foreign key relationships with NoAction delete behavior
 
+## Recent Updates & Features
+
+### Template Management System
+- **Admin Templates Page** (`/admin/templates`): Platform admin interface for creating and managing game templates
+  - Template creation form with validation
+  - Template listing with status and activation windows
+  - Real-time template availability checking
+
+### Template Activation & Competition Lifecycle
+- **Template Activation**: Clubs can activate published templates into competitions
+  - API endpoint: `POST /clubs/:clubId/activate-template/:templateId`
+  - Validation of activation windows and template status
+  - Automatic competition creation with template inheritance
+- **Competition Opening**: Club admins can open competitions (DRAFT → OPEN)
+  - API endpoint: `POST /competitions/:id/open`
+  - Status validation and transition controls
+
+### User Join & Competition Entry System
+- **Join Competition**: Players can join open competitions
+  - API endpoint: `POST /competitions/:id/entries`
+  - Validation of join windows and competition status
+  - Automatic user creation and club membership management
+  - Temporary email-based authentication system
+
+### Competition Detail Pages & Fixture Picking
+- **Competition Detail Page** (`/competitions/[id]`): Comprehensive competition view
+  - Competition information display with status badges
+  - Rounds and fixtures visualization
+  - Integration with fixture picking system
+- **Fixture Picking System**: Interactive fixture selection interface
+  - `FixturePicker` component with radio button selections
+  - Bulk pick submission with validation
+  - Pick deadline enforcement
+  - API endpoint: `POST /picks` for pick submissions
+
+### Enhanced API Endpoints
+Additional endpoints added to support full competition lifecycle:
+
+**Template Management:**
+- `POST /templates` - Create game templates (Platform Admin)
+- `GET /templates` - List templates with filters (status, upcoming)
+- `POST /clubs/:clubId/activate-template/:templateId` - Activate template into competition
+
+**Competition Management:**
+- `POST /competitions/:id/open` - Open competition for entries
+- `GET /competitions/:id` - Get competition details with rounds/fixtures
+- `POST /competitions/:id/entries` - Join competition
+
+**Picks & Fixtures:**
+- `POST /picks` - Submit fixture picks
+
+### Testing Infrastructure
+- **Playwright E2E Testing**: Comprehensive end-to-end test suite
+  - Template activation flow testing
+  - Competition detail page testing
+  - Database setup and teardown
+  - API error response validation
+  - UI component testing
+
+### Schema & Data Model Updates
+- **JoinCompetitionSchema**: Validation for player join requests
+- **Enhanced Competition Model**: Support for template inheritance
+- **Pick System**: User predictions linked to fixtures and rounds
+- **Database Field Corrections**: Fixed field mapping issues between API and schema
+
+### UI Components & Styling
+- **Card Components**: Reusable UI components (`Card`, `CardHeader`)
+- **Site Header**: Navigation with links to clubs and admin templates
+- **Status Badges**: Color-coded competition status display
+- **Responsive Design**: Mobile-friendly layouts with Tailwind CSS
+
+### Bug Fixes & Improvements
+- **API 500 Error Resolution**: Fixed Prisma query field mapping issues
+  - Corrected `deadlineAt` → `pickDeadlineAt` field references
+  - Fixed `homeTeam`/`awayTeam` → `homeTeamId`/`awayTeamId` mapping
+  - Added robust error handling and result parsing
+- **Frontend Error Handling**: Comprehensive error pages and loading states
+- **Validation Layer**: End-to-end validation using Zod schemas
+
+### Development Tools & Debugging
+- **Debug Pages**: Development utilities for viewing competition data
+- **API Route Introspection**: Route debugging capabilities
+- **Console Logging**: Enhanced logging for troubleshooting
+- **Development Workflow**: Optimized pnpm workspace commands
+
 ## Important Notes
 
 - All Fastify plugins use official scoped packages (`@fastify/*`)
@@ -200,3 +314,5 @@ pnpm --filter web dev
 - TypeScript strict mode enabled across all packages
 - Using ES modules throughout the project
 - Single pnpm-lock.yaml at root (no nested lockfiles)
+- **Current Authentication**: Temporary email-based system (to be replaced with proper auth)
+- **Team Data**: Currently using placeholder team names (Team {ID}) - requires Team table population

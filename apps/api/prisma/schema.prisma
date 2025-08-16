@@ -3,29 +3,27 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlserver"
-  url      = env("DATABASE_URL")
+  provider          = "sqlserver"
+  url               = env("DATABASE_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 model Club {
-  id           String    @id @default(cuid())
+  id           String        @id @default(cuid())
   name         String
-  slug         String    @unique
-  // store JSON as text; app enforces shape
-  brandingJson String?   @db.NVarChar(Max)
-  createdAt    DateTime  @default(now())
-  competitions Competition[]
+  slug         String        @unique
+  brandingJson String?       @db.NVarChar(Max)
+  createdAt    DateTime      @default(now())
   members      ClubMember[]
+  competitions Competition[]
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
+  id        String             @id @default(cuid())
+  email     String             @unique
   name      String?
-  // enums not supported in SQL Server connector → store as String
-  role      String    @default("PLAYER") @db.NVarChar(32)
-  createdAt DateTime  @default(now())
+  role      String             @default("PLAYER") @db.NVarChar(32)
+  createdAt DateTime           @default(now())
   members   ClubMember[]
   entries   CompetitionEntry[]
 }
@@ -33,22 +31,21 @@ model User {
 model ClubMember {
   clubId String
   userId String
-  role   String   @default("PLAYER") @db.NVarChar(32)
-
-  club   Club     @relation(fields: [clubId], references: [id], onDelete: NoAction)
-  user   User     @relation(fields: [userId], references: [id], onDelete: NoAction)
+  role   String @default("PLAYER") @db.NVarChar(32)
+  club   Club   @relation(fields: [clubId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   @@id([clubId, userId])
   @@index([userId])
 }
 
 model GameTemplate {
-  id                 String    @id @default(cuid())
+  id                 String        @id @default(cuid())
   name               String
   // "LMS" for Last Man Standing, etc.
-  gameType           String    @db.NVarChar(32)
+  gameType           String        @db.NVarChar(32)
   sport              String
-  status             String    @default("DRAFT") @db.NVarChar(32) // DRAFT | PUBLISHED | ARCHIVED
+  status             String        @default("DRAFT") @db.NVarChar(32) // DRAFT | PUBLISHED | ARCHIVED
   // When clubs may activate this template into their tenant
   activationOpenAt   DateTime?
   activationCloseAt  DateTime?
@@ -58,53 +55,49 @@ model GameTemplate {
   // When the game actually starts (e.g., EPL Week 3 kickoff)
   startAt            DateTime
   // Rules/config stored as text JSON
-  rulesJson          String?   @db.NVarChar(Max)
-  createdAt          DateTime  @default(now())
-
+  rulesJson          String?       @db.NVarChar(Max)
+  createdAt          DateTime      @default(now())
   competitions       Competition[]
 
   @@index([status, startAt])
 }
 
 model Competition {
-  id             String    @id @default(cuid())
-  clubId         String
+  id            String             @id @default(cuid())
+  clubId        String
   // Optional link back to the template used to create this competition
-  templateId     String?
-  name           String
-  sport          String
-  status         String    @default("DRAFT") @db.NVarChar(32) // DRAFT | OPEN | RUNNING | FINISHED
-  entryFeeCents  Int
-  currency       String    @default("EUR")   @db.NVarChar(8)
-  // store JSON as text
-  rulesJson      String?   @db.NVarChar(Max)
-  startRoundAt   DateTime?
-  createdAt      DateTime  @default(now())
-
-  club           Club      @relation(fields: [clubId], references: [id], onDelete: NoAction)
-  template       GameTemplate? @relation(fields: [templateId], references: [id], onDelete: NoAction)
-  rounds         Round[]
-  entries        CompetitionEntry[]
+  templateId    String?
+  name          String
+  sport         String
+  status        String             @default("DRAFT") @db.NVarChar(32)
+  entryFeeCents Int
+  currency      String             @default("EUR") @db.NVarChar(8)
+  rulesJson     String?            @db.NVarChar(Max)
+  startRoundAt  DateTime?
+  createdAt     DateTime           @default(now())
+  club          Club               @relation(fields: [clubId], references: [id])
+  template      GameTemplate?      @relation(fields: [templateId], references: [id])
+  entries       CompetitionEntry[]
+  rounds        Round[]
 
   @@index([clubId, status])
   @@index([templateId])
 }
 
 model Round {
-  id             String    @id @default(cuid())
+  id             String      @id @default(cuid())
   competitionId  String
   roundNumber    Int
   pickDeadlineAt DateTime
-  status         String    @default("UPCOMING") @db.NVarChar(32) // UPCOMING | LOCKED | RESULTING | COMPLETE
-
-  competition    Competition @relation(fields: [competitionId], references: [id], onDelete: NoAction)
+  status         String      @default("UPCOMING") @db.NVarChar(32)
   fixtures       Fixture[]
+  competition    Competition @relation(fields: [competitionId], references: [id])
 
   @@index([competitionId, roundNumber])
 }
 
 model Team {
-  id       String   @id @default(cuid())
+  id       String  @id @default(cuid())
   leagueId String?
   name     String
   extRef   String?
@@ -117,38 +110,35 @@ model Fixture {
   homeTeamId    String
   awayTeamId    String
   kickoffAt     DateTime
-  status        String   @default("SCHEDULED") @db.NVarChar(32) // SCHEDULED | PLAYED | POSTPONED
-  result        String?  @db.NVarChar(32) // HOME | AWAY | DRAW
-
-  round         Round    @relation(fields: [roundId], references: [id], onDelete: NoAction)
+  status        String   @default("SCHEDULED") @db.NVarChar(32)
+  result        String?  @db.NVarChar(32)
+  round         Round    @relation(fields: [roundId], references: [id])
 
   @@index([roundId])
 }
 
 model CompetitionEntry {
-  id              String   @id @default(cuid())
+  id              String      @id @default(cuid())
   competitionId   String
   userId          String
-  status          String   @default("PENDING") @db.NVarChar(32) // PENDING | ACTIVE | ELIMINATED | WON
+  status          String      @default("PENDING") @db.NVarChar(32)
   stripePaymentId String?
-  createdAt       DateTime @default(now())
-
-  competition     Competition     @relation(fields: [competitionId], references: [id], onDelete: NoAction)
-  user            User            @relation(fields: [userId], references: [id], onDelete: NoAction)
+  createdAt       DateTime    @default(now())
+  competition     Competition @relation(fields: [competitionId], references: [id])
+  user            User        @relation(fields: [userId], references: [id])
   picks           Pick[]
 
   @@unique([competitionId, userId])
 }
 
 model Pick {
-  id                  String   @id @default(cuid())
-  competitionEntryId  String
-  roundId             String
-  teamId              String
-  madeAt              DateTime @default(now())
-  status              String   @default("PENDING") @db.NVarChar(32) // PENDING | WIN | LOSE | INVALID
-
-  entry CompetitionEntry @relation(fields: [competitionEntryId], references: [id], onDelete: NoAction)
+  id                 String           @id @default(cuid())
+  competitionEntryId String
+  roundId            String
+  teamId             String
+  madeAt             DateTime         @default(now())
+  status             String           @default("PENDING") @db.NVarChar(32)
+  entry              CompetitionEntry @relation(fields: [competitionEntryId], references: [id])
 
   @@unique([competitionEntryId, roundId])
 }
