@@ -9,6 +9,7 @@
       "Bash(curl:*)",
       "Bash(pnpm dev:*)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits"
   }
 }

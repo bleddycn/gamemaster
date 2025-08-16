@@ -42,9 +42,35 @@ model ClubMember {
   @@index([userId])
 }
 
+model GameTemplate {
+  id                 String    @id @default(cuid())
+  name               String
+  // "LMS" for Last Man Standing, etc.
+  gameType           String    @db.NVarChar(32)
+  sport              String
+  status             String    @default("DRAFT") @db.NVarChar(32) // DRAFT | PUBLISHED | ARCHIVED
+  // When clubs may activate this template into their tenant
+  activationOpenAt   DateTime?
+  activationCloseAt  DateTime?
+  // Player join window (optional hard dates if you don't want relative offsets)
+  joinOpenAt         DateTime?
+  joinCloseAt        DateTime?
+  // When the game actually starts (e.g., EPL Week 3 kickoff)
+  startAt            DateTime
+  // Rules/config stored as text JSON
+  rulesJson          String?   @db.NVarChar(Max)
+  createdAt          DateTime  @default(now())
+
+  competitions       Competition[]
+
+  @@index([status, startAt])
+}
+
 model Competition {
   id             String    @id @default(cuid())
   clubId         String
+  // Optional link back to the template used to create this competition
+  templateId     String?
   name           String
   sport          String
   status         String    @default("DRAFT") @db.NVarChar(32) // DRAFT | OPEN | RUNNING | FINISHED
@@ -56,10 +82,12 @@ model Competition {
   createdAt      DateTime  @default(now())
 
   club           Club      @relation(fields: [clubId], references: [id], onDelete: NoAction)
+  template       GameTemplate? @relation(fields: [templateId], references: [id], onDelete: NoAction)
   rounds         Round[]
   entries        CompetitionEntry[]
 
   @@index([clubId, status])
+  @@index([templateId])
 }
 
 model Round {

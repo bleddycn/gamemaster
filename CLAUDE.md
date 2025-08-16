@@ -79,8 +79,10 @@ onlyBuiltDependencies:
 - `GET /version` - API version info
 - `GET /me` - Placeholder auth endpoint (returns mock user)
 - `GET /clubs` - List all clubs (id, name, slug)
+- `GET /clubs/by-slug/:slug` - Get a club by slug (for frontend detail page)
+- `GET /clubs/:clubId/competitions` - List competitions for a club (optional ?status filter)
 - `POST /clubs` - Create new club with validation
-- `POST /clubs/:clubId/competitions` - Create competition with Zod validation
+- `POST /clubs/:clubId/competitions` - Create competition with Zod validation (status: DRAFT)
 
 **Seed Data (`apps/api/prisma/seed.ts`):**
 - Upserts two GAA clubs: Cavan GAA and Monaghan GAA
@@ -101,6 +103,10 @@ onlyBuiltDependencies:
 **Pages:**
 - `/` - Default Next.js homepage
 - `/clubs` - Server-side rendered clubs list from API
+- `/clubs/[slug]` - Dynamic club detail page with competitions list and creation form
+
+**Components (`apps/web/src/components/`):**
+- `CreateCompetitionForm.tsx` - Client-side form for creating competitions with validation
 
 ## Packages
 
@@ -138,8 +144,31 @@ onlyBuiltDependencies:
 4. **Run migrations:** `pnpm --filter @gm/api run prisma:migrate --name init`
 5. **Seed database:** Prisma will automatically run seed after migration
 6. **Start dev servers:** Run `pnpm dev` to start all services in parallel
+   - Alternative: Run individually with `pnpm --filter @gm/api dev` and `pnpm --filter web dev`
 7. **API runs on:** http://localhost:4000
 8. **Web runs on:** http://localhost:3000
+
+## Running the Application
+
+**Start everything together:**
+```bash
+pnpm dev  # Runs both API and web in parallel
+```
+
+**Start services individually:**
+```bash
+# API only
+pnpm --filter @gm/api dev
+
+# Web only  
+pnpm --filter web dev
+```
+
+**Available routes:**
+- http://localhost:3000 - Homepage
+- http://localhost:3000/clubs - List of all clubs
+- http://localhost:3000/clubs/cavan-gaa - Cavan GAA club page with competitions
+- http://localhost:3000/clubs/monaghan-gaa - Monaghan GAA club page with competitions
 
 ## Database Schema
 

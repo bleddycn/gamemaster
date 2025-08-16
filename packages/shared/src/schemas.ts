@@ -22,3 +22,31 @@ export const CreateClubSchema = z.object({
   brandingJson: z.string().optional() // text JSON stored in SQL Server
 });
 export type CreateClubInput = z.infer<typeof CreateClubSchema>;
+
+// ---------- Game Templates ----------
+export const TemplateStatusEnum = z.enum(["DRAFT","PUBLISHED","ARCHIVED"]);
+export type TemplateStatus = z.infer<typeof TemplateStatusEnum>;
+
+export const CreateGameTemplateSchema = z.object({
+  name: z.string().min(3),
+  gameType: z.string().min(2),      // e.g. "LMS"
+  sport: z.string().min(2),         // e.g. "EPL"
+  status: TemplateStatusEnum.default("DRAFT"),
+  activationOpenAt: z.string().datetime().optional(),  // ISO strings
+  activationCloseAt: z.string().datetime().optional(),
+  joinOpenAt: z.string().datetime().optional(),
+  joinCloseAt: z.string().datetime().optional(),
+  startAt: z.string().datetime(),
+  rulesJson: z.string().optional()
+});
+export type CreateGameTemplateInput = z.infer<typeof CreateGameTemplateSchema>;
+
+// Payload a club provides when activating a template
+export const ActivateTemplateSchema = z.object({
+  // overrideable display name for the club's competition
+  name: z.string().min(3).optional(),
+  // club-specific pricing and currency
+  entryFeeCents: z.number().int().nonnegative(),
+  currency: z.string().length(3).default("EUR")
+});
+export type ActivateTemplateInput = z.infer<typeof ActivateTemplateSchema>;
