@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Props = {
   apiBase: string;
@@ -8,6 +9,7 @@ type Props = {
 };
 
 export default function CreateTemplateForm({ apiBase, onCreated }: Props) {
+  const { token } = useAuth();
   const [name, setName] = useState("");
   const [gameType, setGameType] = useState("LMS");
   const [sport, setSport] = useState("EPL");
@@ -40,12 +42,21 @@ export default function CreateTemplateForm({ apiBase, onCreated }: Props) {
 
       const res = await fetch(`${apiBase}/templates`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data?.error || "Failed to create template");
+        if (res.status === 401) {
+          setError("You must be signed in to perform this action.");
+        } else if (res.status === 403) {
+          setError("You don't have permission to perform this action.");
+        } else {
+          setError(data?.error || "Failed to create template");
+        }
       } else {
         setOk("Template created");
         setName("");

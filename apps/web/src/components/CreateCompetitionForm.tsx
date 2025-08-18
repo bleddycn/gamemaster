@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Props = {
   apiBase: string;
@@ -9,6 +10,7 @@ type Props = {
 };
 
 export default function CreateCompetitionForm({ apiBase, clubId, onCreated }: Props) {
+  const { token } = useAuth();
   const [name, setName] = useState("");
   const [sport, setSport] = useState("EPL");
   const [entryFeeCents, setEntryFeeCents] = useState(1000);
@@ -23,7 +25,10 @@ export default function CreateCompetitionForm({ apiBase, clubId, onCreated }: Pr
     try {
       const res = await fetch(`${apiBase}/clubs/${clubId}/competitions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ name, sport, entryFeeCents, currency })
       });
       const data = await res.json();

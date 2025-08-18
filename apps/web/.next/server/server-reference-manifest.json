@@ -1,39 +1,5 @@
 {
-  "node": {
-    "007a54f34afff9d75cdda044ffa19bbc6eb1289173": {
-      "workers": {
-        "app/admin/templates/page": {
-          "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.4.6_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5Cprojects%5C%5Cgamemaster%5C%5Capps%5C%5Cweb%5C%5Csrc%5C%5Capp%5C%5Cadmin%5C%5Ctemplates%5C%5Cpage.tsx%22%2C%5B%7B%22id%22%3A%22007a54f34afff9d75cdda044ffa19bbc6eb1289173%22%2C%22exportedName%22%3A%22%24%24RSC_SERVER_ACTION_0%22%7D%5D%5D%5D&__client_imported__=!",
-          "async": false
-        }
-      },
-      "layer": {
-        "app/admin/templates/page": "rsc"
-      }
-    },
-    "403271e530c71d2df2f764316660ed3148d36fdedf": {
-      "workers": {
-        "app/clubs/[slug]/page": {
-          "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.4.6_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5Cprojects%5C%5Cgamemaster%5C%5Capps%5C%5Cweb%5C%5Csrc%5C%5Capp%5C%5Cclubs%5C%5C%5Bslug%5D%5C%5Cpage.tsx%22%2C%5B%7B%22id%22%3A%22403271e530c71d2df2f764316660ed3148d36fdedf%22%2C%22exportedName%22%3A%22%24%24RSC_SERVER_ACTION_0%22%7D%2C%7B%22id%22%3A%2240d9ed78fbf29830a3baca4a5f8125d9987b84d0f6%22%2C%22exportedName%22%3A%22%24%24RSC_SERVER_ACTION_1%22%7D%5D%5D%5D&__client_imported__=!",
-          "async": false
-        }
-      },
-      "layer": {
-        "app/clubs/[slug]/page": "rsc"
-      }
-    },
-    "40d9ed78fbf29830a3baca4a5f8125d9987b84d0f6": {
-      "workers": {
-        "app/clubs/[slug]/page": {
-          "moduleId": "(rsc)/../../node_modules/.pnpm/next@15.4.6_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5Cprojects%5C%5Cgamemaster%5C%5Capps%5C%5Cweb%5C%5Csrc%5C%5Capp%5C%5Cclubs%5C%5C%5Bslug%5D%5C%5Cpage.tsx%22%2C%5B%7B%22id%22%3A%22403271e530c71d2df2f764316660ed3148d36fdedf%22%2C%22exportedName%22%3A%22%24%24RSC_SERVER_ACTION_0%22%7D%2C%7B%22id%22%3A%2240d9ed78fbf29830a3baca4a5f8125d9987b84d0f6%22%2C%22exportedName%22%3A%22%24%24RSC_SERVER_ACTION_1%22%7D%5D%5D%5D&__client_imported__=!",
-          "async": false
-        }
-      },
-      "layer": {
-        "app/clubs/[slug]/page": "rsc"
-      }
-    }
-  },
+  "node": {},
   "edge": {},
-  "encryptionKey": "smQERDwKsiTh9ZM21Vzdx1Sbf/BpzK1k7vKX05vAerM="
+  "encryptionKey": "7lg5lBAVDTcwLHzlD2mtFp9YEpgqHezD9rSCEkUAS3w="
 }

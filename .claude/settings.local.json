@@ -8,7 +8,12 @@
       "Bash(npx prisma migrate:*)",
       "Bash(curl:*)",
       "Bash(pnpm dev:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(pnpm add:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(taskkill:*)",
+      "Bash(pnpm --filter web run dev)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

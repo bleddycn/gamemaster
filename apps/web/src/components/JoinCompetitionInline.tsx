@@ -31,7 +31,18 @@ export default function JoinCompetitionInline({ apiBase, competitionId, onJoined
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data?.error || `Failed to join competition (${res.status})`);
+        const apiError = data?.error || "";
+        
+        // Handle specific time window violations
+        if (apiError.includes("Join window has closed")) {
+          setError("Join window has closed.");
+        } else if (apiError.includes("Competition is not open for entries")) {
+          setError("This competition is not currently open for new entries.");
+        } else if (apiError.includes("already joined")) {
+          setError("You've already joined this competition.");
+        } else {
+          setError(apiError || `Failed to join competition (${res.status})`);
+        }
       } else {
         setSuccess("Successfully joined the competition!");
         setEmail("");

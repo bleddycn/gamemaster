@@ -1,12 +1,32 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
+import jwt from "@fastify/jwt";
 import * as dotenv from "dotenv";
 import { CreateCompetitionSchema, CreateClubSchema, CreateGameTemplateSchema, ActivateTemplateSchema, JoinCompetitionSchema } from "@gm/shared";
 import { prisma } from "./db";
+import { hashPassword, verifyPassword, AuthenticatedRequest, requireSiteAdmin, requireClubAdminOrSiteAdmin, requireClubAdminForClubId } from "./auth";
+import { z } from "zod";
 dotenv.config();
 
 const app = Fastify({ logger: true });
+
+// Register JWT plugin
+app.register(jwt, {
+  secret: process.env.JWT_SECRET || "fallback-secret-change-in-production"
+});
+
+// Auth schemas
+const RegisterSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  name: z.string().optional()
+});
+
+const LoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string()
+});
 
 const COMPETITION_STATUSES = new Set(["DRAFT","OPEN","RUNNING","FINISHED"] as const);
 
@@ -25,10 +45,23 @@ function isWithin(now: Date, open?: Date | null, close?: Date | null) {
 app.register(cors, { origin: true });
 app.register(helmet);
 
-// Add request logging for competitions endpoints
-app.addHook("onRequest", async (req) => {
+// Add request logging with userId when available
+app.addHook("onRequest", async (req: AuthenticatedRequest) => {
+  // Try to extract user from JWT if present
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    try {
+      const decoded = await app.jwt.verify(token) as { userId: string; role: string };
+      req.user = decoded;
+    } catch {
+      // Invalid token, continue without user
+    }
+  }
+  
   if (req.url.startsWith("/competitions")) {
-    app.log.info({ method: req.method, url: req.url }, "incoming competitions request");
+    app.log.info({ method: req.method, url: req.url, userId: req.user?.userId }, "incoming competitions request");
+  } else {
+    app.log.info({ method: req.method, url: req.url, userId: req.user?.userId }, "incoming request");
   }
 });
 
@@ -48,9 +81,128 @@ app.get("/__routes", async () => {
   return { routes: tree };
 });
 
-// placeholder auth extraction for later
-app.get("/me", async (req, reply) => {
-  return { userId: "dev-user", roles: ["PLAYER"], clubIds: [] };
+// Auth endpoints
+app.post("/auth/register", async (req, reply) => {
+  const parsed = RegisterSchema.safeParse(req.body);
+  if (!parsed.success) {
+    reply.code(400);
+    return { error: "Validation failed", issues: parsed.error.issues };
+  }
+  
+  const { email, password, name } = parsed.data;
+  
+  // Check if user exists
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    reply.code(409);
+    return { error: "User with this email already exists" };
+  }
+  
+  // Hash password and create user
+  const passwordHash = await hashPassword(password);
+  const user = await prisma.user.create({
+    data: {
+      email,
+      name: name ?? null,
+      passwordHash,
+      role: "PLAYER"
+    },
+    select: { id: true, email: true, name: true, role: true }
+  });
+  
+  // Generate JWT
+  const token = app.jwt.sign({ userId: user.id, role: user.role });
+  
+  return { user, token };
+});
+
+app.post("/auth/login", async (req, reply) => {
+  const parsed = LoginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    reply.code(400);
+    return { error: "Validation failed", issues: parsed.error.issues };
+  }
+  
+  const { email, password } = parsed.data;
+  
+  // Find user
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, email: true, name: true, role: true, passwordHash: true }
+  });
+  
+  if (!user || !user.passwordHash) {
+    reply.code(401);
+    return { error: "Invalid email or password" };
+  }
+  
+  // Verify password
+  const valid = await verifyPassword(password, user.passwordHash);
+  if (!valid) {
+    reply.code(401);
+    return { error: "Invalid email or password" };
+  }
+  
+  // Generate JWT
+  const token = app.jwt.sign({ userId: user.id, role: user.role });
+  
+  // Don't return passwordHash
+  const { passwordHash, ...userWithoutHash } = user;
+  
+  return { user: userWithoutHash, token };
+});
+
+// Get current user from JWT
+app.get("/me", async (req: AuthenticatedRequest, reply) => {
+  if (!req.user) {
+    reply.code(401);
+    return { error: "Not authenticated" };
+  }
+  
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+    select: { 
+      id: true, 
+      email: true, 
+      name: true, 
+      role: true,
+      members: {
+        select: {
+          clubId: true,
+          role: true,
+          club: {
+            select: {
+              name: true,
+              slug: true
+            }
+          }
+        }
+      }
+    }
+  });
+  
+  if (!user) {
+    reply.code(404);
+    return { error: "User not found" };
+  }
+  
+  // Transform memberships to the desired format
+  const memberships = user.members.map(member => ({
+    clubId: member.clubId,
+    clubName: member.club.name,
+    clubSlug: member.club.slug,
+    role: member.role
+  }));
+  
+  req.log.info({ userId: user.id, membershipCount: memberships.length }, "User profile retrieved");
+  
+  return {
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    memberships
+  };
 });
 
 app.post("/clubs/:clubId/competitions", async (req, reply) => {
@@ -115,7 +267,14 @@ app.get("/clubs/:clubId/competitions", async (req) => {
       status: true,
       entryFeeCents: true,
       currency: true,
-      createdAt: true
+      createdAt: true,
+      template: {
+        select: {
+          joinOpenAt: true,
+          joinCloseAt: true,
+          startAt: true
+        }
+      }
     }
   });
   return { items };
@@ -143,8 +302,8 @@ app.post("/clubs", async (req, reply) => {
   return created;
 });
 
-// Create a game template (Platform Admin only - auth to be added later)
-app.post("/templates", async (req, reply) => {
+// Create a game template (SITE_ADMIN only)
+app.post("/templates", { preHandler: requireSiteAdmin }, async (req: AuthenticatedRequest, reply) => {
   const parsed = CreateGameTemplateSchema.safeParse(req.body);
   if (!parsed.success) {
     reply.code(400);
@@ -197,9 +356,14 @@ app.get("/templates", async (req) => {
   return { items };
 });
 
-// Activate a template into a club competition (Club Admin flow)
-app.post("/clubs/:clubId/activate-template/:templateId", async (req, reply) => {
+// Activate a template into a club competition (CLUB_ADMIN for specific club or SITE_ADMIN)
+app.post("/clubs/:clubId/activate-template/:templateId", async (req: AuthenticatedRequest, reply) => {
   const { clubId, templateId } = req.params as { clubId: string; templateId: string };
+  
+  // Check authorization for this specific club
+  await requireClubAdminForClubId(req, reply, clubId);
+  if (reply.sent) return;
+  
   const parsed = ActivateTemplateSchema.safeParse(req.body);
   if (!parsed.success) {
     reply.code(400);
@@ -233,8 +397,16 @@ app.post("/clubs/:clubId/activate-template/:templateId", async (req, reply) => {
     tmpl.activationCloseAt ? new Date(tmpl.activationCloseAt) : undefined
   );
   if (!ok) {
+    req.log.warn({ 
+      userId: req.user?.userId, 
+      clubId, 
+      templateId, 
+      activationOpenAt: tmpl.activationOpenAt?.toISOString(),
+      activationCloseAt: tmpl.activationCloseAt?.toISOString(),
+      now: now.toISOString()
+    }, "Template activation blocked: activation window is closed");
     reply.code(400);
-    return { error: "Activation window is closed for this template" };
+    return { error: "Activation window is closed" };
   }
 
   // Create a competition linked to the template
@@ -259,24 +431,83 @@ app.post("/clubs/:clubId/activate-template/:templateId", async (req, reply) => {
   return created;
 });
 
-// Open a competition (club admin action) → DRAFT -> OPEN
-app.post("/competitions/:id/open", async (req, reply) => {
+// Open a competition (CLUB_ADMIN for specific club or SITE_ADMIN) → DRAFT -> OPEN
+app.post("/competitions/:id/open", async (req: AuthenticatedRequest, reply) => {
   const { id } = req.params as { id: string };
-  // Make sure only DRAFT can become OPEN
-  const comp = await prisma.competition.findUnique({ where: { id }, select: { id: true, status: true } });
+  
+  // Get the competition with its template to check join windows
+  const comp = await prisma.competition.findUnique({ 
+    where: { id }, 
+    select: { 
+      id: true, status: true, clubId: true, templateId: true,
+      template: {
+        select: {
+          id: true,
+          joinOpenAt: true,
+          joinCloseAt: true,
+          startAt: true
+        }
+      }
+    } 
+  });
+  
   if (!comp) {
     reply.code(404);
     return { error: "Competition not found" };
   }
+  
+  // Check authorization for this competition's club
+  await requireClubAdminForClubId(req, reply, comp.clubId);
+  if (reply.sent) return;
+  
   if (comp.status !== "DRAFT") {
     reply.code(400);
     return { error: "Only DRAFT competitions can be opened" };
   }
+  
+  // Enforce join window timing for opening competitions
+  const now = new Date();
+  if (comp.template) {
+    const joinOpenAt = comp.template.joinOpenAt;
+    const joinCloseAt = comp.template.joinCloseAt;
+    const startAt = comp.template.startAt;
+    
+    // Can't open if join window hasn't started yet
+    if (joinOpenAt && now < new Date(joinOpenAt)) {
+      req.log.warn({ 
+        userId: req.user?.userId, 
+        competitionId: id, 
+        templateId: comp.template.id,
+        joinOpenAt: joinOpenAt.toISOString(),
+        now: now.toISOString()
+      }, "Competition opening blocked: join window not yet open");
+      reply.code(400);
+      return { error: "You can't open entries yet" };
+    }
+    
+    // Can't open if join window has already closed or if past start time
+    const effectiveCloseAt = joinCloseAt || startAt;
+    if (effectiveCloseAt && now > new Date(effectiveCloseAt)) {
+      req.log.warn({ 
+        userId: req.user?.userId, 
+        competitionId: id, 
+        templateId: comp.template.id,
+        joinCloseAt: joinCloseAt?.toISOString(),
+        startAt: startAt?.toISOString(),
+        now: now.toISOString()
+      }, "Competition opening blocked: join window has closed");
+      reply.code(400);
+      return { error: "Join window has closed" };
+    }
+  }
+  
   const updated = await prisma.competition.update({
     where: { id },
     data: { status: "OPEN" },
     select: { id: true, status: true }
   });
+  
+  req.log.info({ userId: req.user?.userId, competitionId: id, clubId: comp.clubId, templateId: comp.templateId }, "Competition opened");
   return updated;
 });
 
@@ -373,8 +604,16 @@ app.post("/competitions/:id/entries", async (req, reply) => {
   const closeAt = comp.template?.joinCloseAt ?? comp.startRoundAt ?? comp.template?.startAt ?? null;
 
   if (!isWithin(now, openAt ?? undefined, closeAt ?? undefined)) {
+    req.log.warn({ 
+      competitionId: id, 
+      templateId: comp.templateId,
+      joinOpenAt: openAt?.toISOString(),
+      joinCloseAt: closeAt?.toISOString(),
+      now: now.toISOString(),
+      email 
+    }, "Join attempt blocked: join window is closed");
     reply.code(400);
-    return { error: "Join window is closed for this competition" };
+    return { error: "Join window has closed" };
   }
 
   // Upsert user by email (temporary auth substitute)
@@ -485,6 +724,76 @@ app.post("/picks", async (req, reply) => {
   });
 
   return pick;
+});
+
+// Admin endpoint to assign club admin (SITE_ADMIN only)
+const AssignClubAdminSchema = z.object({
+  email: z.string().email()
+});
+
+app.post("/admin/clubs/:clubId/assign-club-admin", { preHandler: requireSiteAdmin }, async (req: AuthenticatedRequest, reply) => {
+  const { clubId } = req.params as { clubId: string };
+  
+  // Validate input
+  const parsed = AssignClubAdminSchema.safeParse(req.body);
+  if (!parsed.success) {
+    reply.code(400);
+    return { error: "Validation failed", issues: parsed.error.issues };
+  }
+  const { email } = parsed.data;
+  
+  // Check if club exists
+  const club = await prisma.club.findUnique({
+    where: { id: clubId },
+    select: { id: true, name: true }
+  });
+  
+  if (!club) {
+    reply.code(404);
+    return { error: "Club not found" };
+  }
+  
+  // Upsert the user if they don't exist (keep existing role if they have one)
+  const user = await prisma.user.upsert({
+    where: { email },
+    update: {}, // Don't update anything if user exists
+    create: {
+      email,
+      name: null,
+      role: "CLUB_ADMIN" // Default role for new users created this way
+    }
+  });
+  
+  // Upsert ClubMember with CLUB_ADMIN role
+  await prisma.clubMember.upsert({
+    where: {
+      clubId_userId: {
+        clubId,
+        userId: user.id
+      }
+    },
+    update: { role: "CLUB_ADMIN" },
+    create: {
+      clubId,
+      userId: user.id,
+      role: "CLUB_ADMIN"
+    }
+  });
+  
+  req.log.info({ 
+    adminUserId: req.user?.userId, 
+    assignedUserId: user.id, 
+    email, 
+    clubId,
+    clubName: club.name 
+  }, "Club admin assigned");
+  
+  return { 
+    ok: true, 
+    clubId, 
+    userId: user.id, 
+    email 
+  };
 });
 
 const port = Number(process.env.PORT || 4000);

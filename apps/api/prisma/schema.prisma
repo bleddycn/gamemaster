@@ -19,13 +19,14 @@ model Club {
 }
 
 model User {
-  id        String             @id @default(cuid())
-  email     String             @unique
-  name      String?
-  role      String             @default("PLAYER") @db.NVarChar(32)
-  createdAt DateTime           @default(now())
-  members   ClubMember[]
-  entries   CompetitionEntry[]
+  id           String             @id @default(cuid())
+  email        String             @unique
+  name         String?
+  passwordHash String?            @db.NVarChar(255)
+  role         String             @default("PLAYER") @db.NVarChar(32)
+  createdAt    DateTime           @default(now())
+  members      ClubMember[]
+  entries      CompetitionEntry[]
 }
 
 model ClubMember {

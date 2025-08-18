@@ -65,11 +65,12 @@ function formatCurrency(cents: number, currency: string) {
   return `${currency} ${(cents / 100).toFixed(2)}`;
 }
 
-export default async function CompetitionPage({ params }: { params: { id: string } }) {
+export default async function CompetitionPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   let competition: Competition;
   
   try {
-    competition = await getCompetition(params.id);
+    competition = await getCompetition(id);
   } catch (error) {
     // Return error page
     return (
@@ -78,7 +79,7 @@ export default async function CompetitionPage({ params }: { params: { id: string
           <Card>
             <CardHeader title="Competition Not Found" subtitle="The competition you're looking for doesn't exist or has been removed." />
             <div className="text-center py-8">
-              <p className="text-gray-600 mb-4">Competition ID: {params.id}</p>
+              <p className="text-gray-600 mb-4">Competition ID: {id}</p>
               <a 
                 href="/clubs"
                 className="inline-block rounded-lg bg-blue-600 text-white px-6 py-2 font-medium hover:bg-blue-700 transition"
