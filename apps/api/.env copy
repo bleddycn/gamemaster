@@ -1,0 +1,10 @@
+# Azure SQL connection string (sqlserver provider)
+# Replace placeholders and copy to .env (DO NOT COMMIT real secrets)
+DATABASE_URL="sqlserver://gm-sql-srv.database.windows.net:1433;database=gmasterdb;user=srvadmin;password=h5n8MtFj2Jax2kPx2D;encrypt=true;trustServerCertificate=false"
+SHADOW_DATABASE_URL="sqlserver://gm-sql-srv.database.windows.net:1433;database=gmaster-shadow;user=srvadmin;password=h5n8MtFj2Jax2kPx2D;encrypt=true;trustServerCertificate=false"
+
+# Fastify
+PORT=4000
+
+# JWT Secret - use a strong, random string in production
+JWT_SECRET="dev-jwt-secret-change-in-production-abc123xyz789"
