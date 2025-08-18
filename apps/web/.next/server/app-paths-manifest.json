@@ -1,0 +1,7 @@
+{
+  "/admin/templates/page": "app/admin/templates/page.js",
+  "/clubs/[slug]/page": "app/clubs/[slug]/page.js",
+  "/page": "app/page.js",
+  "/clubs/page": "app/clubs/page.js",
+  "/competitions/[id]/page": "app/competitions/[id]/page.js"
+}
